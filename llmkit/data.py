@@ -301,3 +301,49 @@ def tokenize_simple(text):
         tokens: List of tokens (words)
     """
     return text.lower().split()
+
+
+# ============================================================================
+# Sequence Data Helpers (Chapters 7-11)
+# ============================================================================
+
+def prepare_lm_sequences(token_ids, seq_len=64):
+    """Create (input, target) pairs for language modeling.
+
+    Slides a window of length seq_len over token_ids.
+    Each input sequence is paired with itself shifted one step right as target.
+
+    Args:
+        token_ids: List or 1-D array of integer token ids
+        seq_len:   Length of each input/target sequence
+
+    Returns:
+        inputs:  LongTensor (n_sequences, seq_len)
+        targets: LongTensor (n_sequences, seq_len)
+    """
+    import torch
+    if not isinstance(token_ids, torch.Tensor):
+        token_ids = torch.tensor(token_ids, dtype=torch.long)
+
+    inputs, targets = [], []
+    for i in range(len(token_ids) - seq_len):
+        inputs.append(token_ids[i : i + seq_len])
+        targets.append(token_ids[i + 1 : i + seq_len + 1])
+
+    return torch.stack(inputs), torch.stack(targets)
+
+
+def get_token_ids(corpus, tokenizer):
+    """Encode a raw text corpus to a flat list of integer token ids.
+
+    Args:
+        corpus:    Raw text string
+        tokenizer: Object with an .encode_ids(str) → list[int] method
+                   (e.g. the BytePairEncoding instance from ch06_bpe)
+
+    Returns:
+        token_ids: List[int]
+    """
+    if hasattr(tokenizer, 'encode_ids'):
+        return tokenizer.encode_ids(corpus)
+    return tokenizer.encode(corpus)

@@ -626,3 +626,233 @@ def plot_token_lengths(tokens, figsize=(10, 5)):
     plt.grid(True, alpha=0.3, axis='y')
     plt.tight_layout()
     plt.show()
+
+
+# ============================================================================
+# Chapter 7: RNN
+# ============================================================================
+
+def plot_hidden_states(h_seq, figsize=(12, 4)):
+    """Plot the L2 norm of hidden states over timesteps.
+
+    Shows how much information the RNN is carrying at each position.
+
+    Args:
+        h_seq: numpy array or torch.Tensor (seq_len, hidden_size)
+               — one sequence (no batch dimension)
+        figsize: Figure size
+    """
+    import torch
+    if isinstance(h_seq, torch.Tensor):
+        h_seq = h_seq.detach().cpu().numpy()
+
+    norms = np.linalg.norm(h_seq, axis=-1)   # (seq_len,)
+
+    plt.figure(figsize=figsize)
+    plt.plot(norms, linewidth=2, color='steelblue')
+    plt.fill_between(range(len(norms)), norms, alpha=0.2, color='steelblue')
+    plt.xlabel('Timestep', fontsize=12)
+    plt.ylabel('||h_t||  (hidden state norm)', fontsize=12)
+    plt.title('Hidden State Magnitude Over the Sequence', fontsize=14, fontweight='bold')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================================
+# Chapter 8: LSTM
+# ============================================================================
+
+def plot_gate_activations(gates_dict, n_show=20, figsize=(14, 8)):
+    """Plot LSTM gate activation heatmaps.
+
+    Args:
+        gates_dict: dict with keys 'forget', 'input', 'gate', 'output'
+                    each mapping to a numpy/tensor array of shape
+                    (seq_len, hidden_size) — for one example sequence
+        n_show:     Number of hidden units to show (columns)
+        figsize:    Figure size
+    """
+    import torch
+    gate_names  = ['forget', 'input', 'gate', 'output']
+    gate_titles = ['Forget Gate (f)', 'Input Gate (i)',
+                   'Cell Candidate (g)', 'Output Gate (o)']
+    cmaps = ['Blues', 'Greens', 'RdBu_r', 'Oranges']
+
+    fig, axes = plt.subplots(2, 2, figsize=figsize)
+    axes = axes.flatten()
+
+    for ax, name, title, cmap in zip(axes, gate_names, gate_titles, cmaps):
+        data = gates_dict[name]
+        if isinstance(data, torch.Tensor):
+            data = data.detach().cpu().numpy()
+        data = data[:, :n_show]   # (seq_len, n_show)
+        im = ax.imshow(data.T, aspect='auto', cmap=cmap, vmin=0, vmax=1)
+        plt.colorbar(im, ax=ax)
+        ax.set_xlabel('Timestep', fontsize=10)
+        ax.set_ylabel('Hidden unit', fontsize=10)
+        ax.set_title(title, fontsize=12, fontweight='bold')
+
+    plt.suptitle('LSTM Gate Activations', fontsize=14, fontweight='bold', y=1.01)
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================================
+# Chapter 9: Attention
+# ============================================================================
+
+def plot_attention_weights(weights, tokens, figsize=(10, 8)):
+    """Plot an attention weight matrix as an annotated heatmap.
+
+    Rows = query positions (what is being predicted),
+    Columns = key positions (what is being attended to).
+
+    Args:
+        weights: numpy array or torch.Tensor (seq_len, seq_len)
+        tokens:  List[str] of length seq_len (token labels)
+        figsize: Figure size
+    """
+    import torch
+    if isinstance(weights, torch.Tensor):
+        weights = weights.detach().cpu().numpy()
+
+    n = len(tokens)
+    fig, ax = plt.subplots(figsize=figsize)
+    im = ax.imshow(weights, cmap='Blues', vmin=0, vmax=weights.max())
+    plt.colorbar(im, ax=ax, label='Attention weight')
+
+    ax.set_xticks(range(n))
+    ax.set_yticks(range(n))
+    ax.set_xticklabels(tokens, rotation=45, ha='right', fontsize=9)
+    ax.set_yticklabels(tokens, fontsize=9)
+    ax.set_xlabel('Key (attending to)', fontsize=11)
+    ax.set_ylabel('Query (being predicted)', fontsize=11)
+    ax.set_title('Attention Weights', fontsize=14, fontweight='bold')
+
+    # Annotate cells with values
+    for i in range(n):
+        for j in range(n):
+            val = weights[i, j]
+            color = 'white' if val > weights.max() * 0.6 else 'black'
+            ax.text(j, i, f'{val:.2f}', ha='center', va='center',
+                    fontsize=7, color=color)
+
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================================
+# Chapter 10: Transformer
+# ============================================================================
+
+def plot_multi_head_attention(all_weights, tokens, figsize=None):
+    """Plot per-head attention heatmaps in a grid.
+
+    Args:
+        all_weights: numpy array or torch.Tensor (n_heads, seq_len, seq_len)
+                     — for a single example, single layer
+        tokens:      List[str] of length seq_len
+        figsize:     Figure size (auto-computed if None)
+    """
+    import torch
+    if isinstance(all_weights, torch.Tensor):
+        all_weights = all_weights.detach().cpu().numpy()
+
+    n_heads = all_weights.shape[0]
+    n_cols  = min(n_heads, 4)
+    n_rows  = (n_heads + n_cols - 1) // n_cols
+    if figsize is None:
+        figsize = (4 * n_cols, 3.5 * n_rows)
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
+    axes = np.array(axes).flatten() if n_heads > 1 else [axes]
+
+    for head_idx, ax in enumerate(axes):
+        if head_idx >= n_heads:
+            ax.axis('off')
+            continue
+        w = all_weights[head_idx]
+        im = ax.imshow(w, cmap='Blues', vmin=0, vmax=w.max())
+        ax.set_title(f'Head {head_idx + 1}', fontsize=11, fontweight='bold')
+        ax.set_xticks(range(len(tokens)))
+        ax.set_yticks(range(len(tokens)))
+        ax.set_xticklabels(tokens, rotation=45, ha='right', fontsize=7)
+        ax.set_yticklabels(tokens, fontsize=7)
+
+    plt.suptitle('Multi-Head Attention Patterns', fontsize=13, fontweight='bold')
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_positional_encoding(pe, figsize=(12, 5)):
+    """Plot sinusoidal positional encodings as a heatmap.
+
+    Args:
+        pe:      numpy array or torch.Tensor (seq_len, d_model)
+        figsize: Figure size
+    """
+    import torch
+    if isinstance(pe, torch.Tensor):
+        pe = pe.detach().cpu().numpy()
+    if pe.ndim == 3:
+        pe = pe[0]   # remove batch dim if present
+
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+
+    # Heatmap
+    im = axes[0].imshow(pe, aspect='auto', cmap='RdBu_r', vmin=-1, vmax=1)
+    plt.colorbar(im, ax=axes[0])
+    axes[0].set_xlabel('Dimension', fontsize=11)
+    axes[0].set_ylabel('Position', fontsize=11)
+    axes[0].set_title('Positional Encoding Heatmap', fontsize=12, fontweight='bold')
+
+    # A few individual dimensions
+    for dim in [0, 1, 4, 8]:
+        if dim < pe.shape[1]:
+            axes[1].plot(pe[:, dim], label=f'dim {dim}', linewidth=1.5)
+    axes[1].set_xlabel('Position', fontsize=11)
+    axes[1].set_ylabel('Value', fontsize=11)
+    axes[1].set_title('Encoding Values by Dimension', fontsize=12, fontweight='bold')
+    axes[1].legend(fontsize=9)
+    axes[1].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================================
+# Chapter 11: Generation
+# ============================================================================
+
+def plot_generation_samples(samples_dict, figsize=(12, 4)):
+    """Display generated text samples for different decoding strategies.
+
+    Args:
+        samples_dict: dict mapping strategy label → generated string
+                      e.g. {'greedy': '...', 'temp=0.8': '...', ...}
+        figsize:      Figure size (used for the enclosing figure)
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.axis('off')
+
+    n = len(samples_dict)
+    row_height = 0.85 / max(n, 1)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    for idx, (label, text) in enumerate(samples_dict.items()):
+        y = 0.95 - idx * row_height
+        color = colors[idx % len(colors)]
+        ax.text(0.0, y, f'{label}:', fontsize=11, fontweight='bold',
+                color=color, transform=ax.transAxes, va='top')
+        # Wrap long text
+        max_chars = 110
+        display = text if len(text) <= max_chars else text[:max_chars] + '…'
+        ax.text(0.18, y, display, fontsize=10, color='black',
+                transform=ax.transAxes, va='top',
+                fontfamily='monospace', wrap=True)
+
+    ax.set_title('Generated Text — Decoding Strategy Comparison',
+                 fontsize=13, fontweight='bold')
+    plt.tight_layout()
+    plt.show()
