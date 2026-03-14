@@ -102,13 +102,13 @@ def greedy_decode(model, prompt_ids, max_new_tokens=50):
     """
     model.eval()
     ids = prompt_ids.clone().unsqueeze(0)   # (1, seq_len)
-    max_ctx = model.max_seq_len
+    max_ctx = getattr(model, 'max_seq_len', None)
 
     with torch.no_grad():
         for _ in range(max_new_tokens):
-            # Trim to model's maximum context window
-            ctx = ids[:, -max_ctx:]
-            logits, _ = model(ctx)
+            # Trim to model's maximum context window (Transformer only)
+            ctx = ids[:, -max_ctx:] if max_ctx is not None else ids
+            logits = model(ctx)[0]
             next_logits = logits[0, -1, :]          # last position
             next_id = next_logits.argmax(dim=-1)
             ids = torch.cat([ids, next_id.unsqueeze(0).unsqueeze(0)], dim=1)
@@ -145,12 +145,12 @@ def generate(model, tokenizer, prompt, max_new_tokens=100,
 
     prompt_ids = torch.tensor(encode_fn(prompt), dtype=torch.long)
     ids = prompt_ids.clone().unsqueeze(0)
-    max_ctx = model.max_seq_len
+    max_ctx = getattr(model, 'max_seq_len', None)
 
     with torch.no_grad():
         for _ in range(max_new_tokens):
-            ctx = ids[:, -max_ctx:]
-            logits, _ = model(ctx)
+            ctx = ids[:, -max_ctx:] if max_ctx is not None else ids
+            logits = model(ctx)[0]
             next_logits = logits[0, -1, :]
 
             if strategy == 'greedy':

@@ -632,17 +632,26 @@ def plot_token_lengths(tokens, figsize=(10, 5)):
 # Chapter 7: RNN
 # ============================================================================
 
-def plot_hidden_states(h_seq, figsize=(12, 4)):
+def plot_hidden_states(model_or_hseq, inputs=None, figsize=(12, 4)):
     """Plot the L2 norm of hidden states over timesteps.
 
     Shows how much information the RNN is carrying at each position.
 
     Args:
-        h_seq: numpy array or torch.Tensor (seq_len, hidden_size)
-               — one sequence (no batch dimension)
-        figsize: Figure size
+        model_or_hseq: Either an RNN model (if inputs is provided) or a numpy/torch
+                       array of shape (seq_len, hidden_size) — one sequence, no batch dim
+        inputs:        If provided, run the model on this input to extract h_seq.
+                       Expected shape: (1, seq_len) token ids
+        figsize:       Figure size
     """
     import torch
+    if inputs is not None:
+        with torch.no_grad():
+            _, h_seq = model_or_hseq(inputs)  # h_seq shape: (seq_len, hidden_size) after squeeze
+            h_seq = h_seq.squeeze(0).detach().cpu().numpy()
+    else:
+        h_seq = model_or_hseq
+
     if isinstance(h_seq, torch.Tensor):
         h_seq = h_seq.detach().cpu().numpy()
 
@@ -663,17 +672,27 @@ def plot_hidden_states(h_seq, figsize=(12, 4)):
 # Chapter 8: LSTM
 # ============================================================================
 
-def plot_gate_activations(gates_dict, n_show=20, figsize=(14, 8)):
+def plot_gate_activations(model_or_gates, inputs=None, n_show=20, figsize=(14, 8)):
     """Plot LSTM gate activation heatmaps.
 
     Args:
-        gates_dict: dict with keys 'forget', 'input', 'gate', 'output'
-                    each mapping to a numpy/tensor array of shape
-                    (seq_len, hidden_size) — for one example sequence
-        n_show:     Number of hidden units to show (columns)
-        figsize:    Figure size
+        model_or_gates: Either an LSTM model (if inputs is provided) or a dict with
+                        keys 'forget', 'input', 'gate', 'output', each mapping to a
+                        numpy/tensor array of shape (seq_len, hidden_size)
+        inputs:         If provided, run the model on this input to extract gate activations.
+                        Expected shape: (1, seq_len) token ids
+        n_show:         Number of hidden units to show (columns)
+        figsize:        Figure size
     """
     import torch
+    if inputs is not None:
+        with torch.no_grad():
+            _, gates_info = model_or_gates(inputs)
+            # gates_info is a dict with keys 'forget', 'input', 'gate', 'output'
+            gates_dict = {k: v.squeeze(0).detach().cpu().numpy() for k, v in gates_info.items()}
+    else:
+        gates_dict = model_or_gates
+
     gate_names  = ['forget', 'input', 'gate', 'output']
     gate_titles = ['Forget Gate (f)', 'Input Gate (i)',
                    'Cell Candidate (g)', 'Output Gate (o)']
